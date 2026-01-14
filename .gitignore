@@ -11,3 +11,10 @@ MCPs/
 scripts/
 thoughts/
 eu_leapfrog_repo/
+
+.mcp.json
+.claude/
+.vscode/
+logs
+*.log
+.DS_Store
