@@ -1,0 +1,21 @@
+[submodule "frontend_webapp"]
+	path = frontend_webapp
+	url = https://github.com/sceneXtras/frontend_webapp.git
+[submodule "mobile_app_sx"]
+	path = mobile_app_sx
+	url = https://github.com/sceneXtras/mobile_app_sx.git
+[submodule "golang_search_engine"]
+	path = golang_search_engine
+	url = https://github.com/sceneXtras/golang_search_engine.git
+[submodule "golang_auth_gateway"]
+	path = golang_auth_gateway
+	url = https://github.com/sceneXtras/golang_auth_gateway.git
+[submodule "automations"]
+	path = automations
+	url = https://github.com/sceneXtras/automations.git
+[submodule "sceneXtras"]
+	path = sceneXtras
+	url = https://github.com/Securiteru/sceneXtras.git
+[submodule "website-backoffice"]
+	path = website-backoffice
+	url = https://github.com/Securiteru/website-backoffice

@@ -1,0 +1,13 @@
+# Non-submodule folders (local only)
+cloudflare_ops/
+customerio_ops/
+posthog_ops/
+revenucat_ops/
+mobile_app_sx-expo-ota/
+sceneXtras-prompt-management/
+golang_transcription_service/
+health-monitor/
+MCPs/
+scripts/
+thoughts/
+eu_leapfrog_repo/
