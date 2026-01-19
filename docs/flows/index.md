@@ -14,6 +14,12 @@ Navigate to each service's business flow documentation:
 | [Automations](../../automations/flows/BUSINESS_FLOWS.md) | E2E testing, n8n workflows | 12 diagrams |
 | [Python API](../../sceneXtras/api/flows/BUSINESS_FLOWS.md) | Core backend, AI chat, business logic | 10 diagrams |
 
+## Cross-Cutting Business Flows
+
+| Topic | Description | Diagrams |
+|-------|-------------|----------|
+| [Chat & Quotas](./CHAT_BUSINESS_FLOWS.md) | Quota system, user tiers, pricing, paywall triggers | 10 diagrams |
+
 ## System Architecture
 
 [View System-Wide Architecture](../SYSTEM_ARCHITECTURE_FLOWS.md) - Shows how all services interact
