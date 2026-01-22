@@ -1,0 +1,7 @@
+WAIT=10
+TIMEOUT=60
+ATTEMPTS=10
+
+# Format: <path> <expected_content>
+# Health check - ensures service is healthy
+/health healthy

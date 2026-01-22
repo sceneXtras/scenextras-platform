@@ -1,0 +1,165 @@
+name: Deployment Notifications
+
+on:
+  push:
+    branches:
+      - main
+  workflow_run:
+    workflows: ["Deploy to Dokku"]
+    types:
+      - completed
+
+jobs:
+  notify-deployment:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+
+    steps:
+      - name: Notify deployment start
+        if: github.event.workflow_run.conclusion == 'queued' || github.event.workflow_run.conclusion == 'in_progress'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -X POST "$DISCORD_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"embeds\": [{
+                  \"title\": \"🚀 Deployment Started\",
+                  \"description\": \"Bug Report API deployment in progress...\",
+                  \"color\": 3447003,
+                  \"fields\": [
+                    {
+                      \"name\": \"Commit\",
+                      \"value\": \"\`${{ github.event.workflow_run.head_sha }}\`\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Branch\",
+                      \"value\": \"\`${{ github.event.workflow_run.head_branch }}\`\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Triggered By\",
+                      \"value\": \"${{ github.event.workflow_run.actor.login }}\",
+                      \"inline\": true
+                    }
+                  ],
+                  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
+                }]
+              }"
+          fi
+
+      - name: Notify deployment success
+        if: github.event.workflow_run.conclusion == 'success'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -X POST "$DISCORD_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"embeds\": [{
+                  \"title\": \"✅ Deployment Successful\",
+                  \"description\": \"Bug Report API deployed successfully!\",
+                  \"color\": 5763719,
+                  \"fields\": [
+                    {
+                      \"name\": \"Commit\",
+                      \"value\": \"\`${GITHUB_SHA:0:7}\`\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Branch\",
+                      \"value\": \"\`${{ github.event.workflow_run.head_branch }}\`\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Service URL\",
+                      \"value\": \"[Health Check](https://bug-report.dokku-scenextras.eastus.cloudapp.azure.com/health)\"
+                    }
+                  ],
+                  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
+                }]
+              }"
+          fi
+
+      - name: Notify deployment failure
+        if: github.event.workflow_run.conclusion == 'failure'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -X POST "$DISCORD_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"embeds\": [{
+                  \"title\": \"🚨 Deployment Failed\",
+                  \"description\": \"Bug Report API deployment encountered errors!\",
+                  \"color\": 15158332,
+                  \"fields\": [
+                    {
+                      \"name\": \"Commit\",
+                      \"value\": \"\`${GITHUB_SHA:0:7}\`\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Branch\",
+                      \"value\": \"\`${{ github.event.workflow_run.head_branch }}\`\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Triggered By\",
+                      \"value\": \"${{ github.event.workflow_run.actor.login }}\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Logs\",
+                      \"value\": \"[View GitHub Actions](${{ github.event.workflow_run.html_url }})\"
+                    }
+                  ],
+                  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
+                }]
+              }"
+          fi
+
+  notify-push:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Notify commit pushed
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            # Get commit message (truncate to 200 chars)
+            COMMIT_MSG=$(echo "${{ github.event.head_commit.message }}" | head -c 200)
+
+            curl -X POST "$DISCORD_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"embeds\": [{
+                  \"title\": \"📝 Code Pushed to Main\",
+                  \"description\": \"Bug Report API deployment will start shortly...\",
+                  \"color\": 3066993,
+                  \"fields\": [
+                    {
+                      \"name\": \"Commit\",
+                      \"value\": \"\`${GITHUB_SHA:0:7}\`\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Author\",
+                      \"value\": \"${{ github.event.head_commit.author.name }}\",
+                      \"inline\": true
+                    },
+                    {
+                      \"name\": \"Message\",
+                      \"value\": \"$COMMIT_MSG\"
+                    }
+                  ],
+                  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
+                }]
+              }"
+          fi
