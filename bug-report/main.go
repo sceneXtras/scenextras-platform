@@ -21,27 +21,29 @@ func main() {
 	}
 
 	connectionString := os.Getenv("AZURE_STORAGE_CONNECTION_STRING")
-	if connectionString == "" {
-		log.Fatal("AZURE_STORAGE_CONNECTION_STRING environment variable is required")
-	}
-
 	containerName := os.Getenv("AZURE_CONTAINER_NAME")
 	if containerName == "" {
 		containerName = "bug-reports"
 	}
 
-	// Initialize Azure Storage
-	azureStorage, err := storage.NewAzureStorage(connectionString, containerName)
-	if err != nil {
-		log.Fatalf("Failed to initialize Azure Storage: %v", err)
-	}
+	// Initialize Azure Storage (optional - if not configured, reports will be logged only)
+	var azureStorage *storage.AzureStorage
+	if connectionString != "" {
+		var err error
+		azureStorage, err = storage.NewAzureStorage(connectionString, containerName)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Azure Storage: %v (reports will be logged only)", err)
+		} else {
+			// Ensure container exists
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
 
-	// Ensure container exists
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := azureStorage.EnsureContainer(ctx); err != nil {
-		log.Printf("Warning: failed to ensure container exists: %v", err)
+			if err := azureStorage.EnsureContainer(ctx); err != nil {
+				log.Printf("Warning: failed to ensure container exists: %v", err)
+			}
+		}
+	} else {
+		log.Println("Warning: AZURE_STORAGE_CONNECTION_STRING not set - reports will be logged only (no persistence)")
 	}
 
 	// Set Gin mode
