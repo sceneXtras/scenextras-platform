@@ -131,14 +131,14 @@ func (h *ReportHandler) SubmitReport(c *gin.Context) {
 		TraceID:           traceID,
 	}
 
-	// Handle screenshot upload
+	// Handle screenshot upload (only if storage is configured)
 	file, _, err := c.Request.FormFile("screenshot")
 	if err == nil {
 		defer file.Close()
 
 		// Read screenshot data
 		screenshotData, err := io.ReadAll(file)
-		if err == nil {
+		if err == nil && h.storage != nil {
 			// Upload screenshot
 			screenshotURL, err := h.storage.SaveScreenshot(c.Request.Context(), reportID, screenshotData)
 			if err != nil {
@@ -149,13 +149,19 @@ func (h *ReportHandler) SubmitReport(c *gin.Context) {
 		}
 	}
 
-	// Save report to Azure
-	if err := h.storage.SaveReport(c.Request.Context(), report); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Failed to save report",
-		})
-		return
+	// Save report to Azure (if storage is configured)
+	if h.storage != nil {
+		if err := h.storage.SaveReport(c.Request.Context(), report); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to save report",
+			})
+			return
+		}
+	} else {
+		// Log report when storage is not configured
+		reportJSON, _ := json.Marshal(report)
+		fmt.Printf("Bug report received (no storage): %s\n", string(reportJSON))
 	}
 
 	// Forward to LogWard
