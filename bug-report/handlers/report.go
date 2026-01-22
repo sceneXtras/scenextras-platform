@@ -77,14 +77,18 @@ func (h *ReportHandler) SubmitReport(c *gin.Context) {
 		return
 	}
 
-	// Parse logs
+	// Parse logs - accept either JSON array or raw text
 	var logs []models.LogEntry
-	if err := json.Unmarshal([]byte(logsJSON), &logs); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid logs JSON",
-		})
-		return
+	if logsJSON != "" {
+		// Try parsing as JSON first
+		if err := json.Unmarshal([]byte(logsJSON), &logs); err != nil {
+			// If JSON parsing fails, treat as raw log text
+			logs = []models.LogEntry{{
+				Timestamp: time.Now().Format(time.RFC3339),
+				Level:     "info",
+				Message:   logsJSON,
+			}}
+		}
 	}
 
 	// Parse device info
