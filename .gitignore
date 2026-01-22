@@ -1,4 +1,5 @@
 # Non-submodule folders (local only)
+bug-report/
 cloudflare_ops/
 customerio_ops/
 posthog_ops/

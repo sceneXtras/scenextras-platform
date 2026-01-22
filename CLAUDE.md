@@ -68,6 +68,46 @@ SceneXtras is a multi-service application ecosystem for interactive movie/TV cha
 3. **Go Search Engine** (`golang_search_engine/`) - High-performance autocomplete service with TMDB integration
 4. **React Native Mobile App** (`mobile_app_sx/`) - Expo-based cross-platform mobile application
 
+## Root Makefile
+
+A unified command hub is available at the repository root. Run `make` or `make help` for the full reference.
+
+### Quick Commands
+
+```bash
+make                  # Show all available commands (colored help)
+make dev-api          # Start Python API
+make dev-web          # Start React web frontend
+make dev-search       # Start Go search engine
+make dev-mobile       # Start React Native app (web mode)
+
+make test-all         # Run all service tests
+make test-api-smoke   # Quick API smoke tests
+make lint-api         # Lint Python API
+make quality-api      # Full quality check
+
+make logs             # Interactive production log viewer
+make logs-api         # View API logs
+make health           # Health check all services
+make history-api      # Search historical API logs
+
+make deploy-api       # Deploy API to Dokku
+make rollback-api     # Rollback API to previous release
+
+make help-api         # Show API-specific Makefile commands
+make help-search      # Show search-specific commands
+```
+
+### Aliases
+
+| Alias | Command |
+|-------|---------|
+| `make api` | `make dev-api` |
+| `make web` | `make dev-web` |
+| `make t` | `make test-api-smoke` |
+| `make l` | `make logs` |
+| `make h` | `make health` |
+
 ## Quick Start Commands
 
 ### Python API Backend (FastAPI)
@@ -279,6 +319,119 @@ WAIT=10  TIMEOUT=60  ATTEMPTS=10
 ```
 
 **Deployment Flow:** Push → Build → Health checks → Pass = replace old container, Fail = keep old running
+
+## Production Log Viewer
+
+A secure, read-only log viewer script for checking production logs from various sources.
+
+### Location
+
+```bash
+scripts/ops/logs.sh
+```
+
+### Usage
+
+```bash
+# Interactive menu (recommended for exploration)
+./scripts/ops/logs.sh
+
+# Recent/live logs
+./scripts/ops/logs.sh dokku scenextras 200          # Last 200 lines from app
+./scripts/ops/logs.sh dokku scenextras -f           # Follow logs live
+./scripts/ops/logs.sh nginx error 50                # Last 50 nginx error lines
+./scripts/ops/logs.sh search scenextras "error" 100 # Search recent logs
+
+# Historical logs (past containers, rotated files)
+./scripts/ops/logs.sh history scenextras "1 day ago"                    # App logs from journald
+./scripts/ops/logs.sh history scenextras "2024-01-15" "2024-01-16" "error"  # Date range + pattern
+./scripts/ops/logs.sh history scenextras "yesterday" "" "timeout" 500   # Yesterday's timeouts
+./scripts/ops/logs.sh history-nginx error "502" 200                     # Search rotated nginx logs
+./scripts/ops/logs.sh history-docker scenextras.web.1 "error"           # Docker log files
+./scripts/ops/logs.sh history-journal docker "1 week ago"               # Journald with date range
+
+# Utilities
+./scripts/ops/logs.sh health                        # Quick health check all services
+./scripts/ops/logs.sh list                          # List all apps/containers
+```
+
+### Persistent Log Storage (Historical Logs)
+
+The API has persistent log files mounted outside the container at:
+```
+/var/lib/dokku/data/storage/scenextras-logs/
+```
+
+**Available log files:**
+- `app.log` - Main application logs (JSON format)
+- `error.log` - Error logs
+- `security.log` - Security events
+- `payment_service.log` - Payment transactions
+- `notification_service.log` - Push notifications
+- `cronjobs.log` - Scheduled task logs
+
+**Search historical logs directly via SSH:**
+```bash
+# Search for errors from 5 hours ago (timestamp format: 2026-01-20T17:)
+ssh -i ~/.ssh/dokku_azure dokku@dokku-scenextras.eastus.cloudapp.azure.com \
+  "grep '2026-01-20T17' /var/lib/dokku/data/storage/scenextras-logs/app.log | head -50"
+
+# Search for specific error patterns
+ssh -i ~/.ssh/dokku_azure dokku@dokku-scenextras.eastus.cloudapp.azure.com \
+  "grep -i 'error\|exception' /var/lib/dokku/data/storage/scenextras-logs/error.log | tail -100"
+
+# Check payment issues
+ssh -i ~/.ssh/dokku_azure dokku@dokku-scenextras.eastus.cloudapp.azure.com \
+  "tail -100 /var/lib/dokku/data/storage/scenextras-logs/payment_service.log"
+```
+
+**Note:** Use `dokku logs` for real-time streaming; use persistent storage for historical analysis.
+
+### Available Commands
+
+**Recent/Live Logs:**
+
+| Command | Description |
+|---------|-------------|
+| `dokku <app> [lines] [-f]` | Dokku app logs (follow with -f) |
+| `nginx <access\|error> [lines] [app]` | Nginx access/error logs |
+| `docker [container] [lines] [-f]` | Docker container logs |
+| `system [service] [lines]` | System/journald logs |
+| `search <app> <pattern> [lines]` | Search in recent app logs |
+
+**Historical Logs (past containers, rotated files):**
+
+| Command | Description |
+|---------|-------------|
+| `history <app> [since] [until] [pattern] [lines]` | Search app logs via journald |
+| `history-nginx <access\|error> [pattern] [lines]` | Search rotated nginx logs |
+| `history-docker [container] [pattern] [lines]` | Search Docker log files on disk |
+| `history-journal [service] [since] [until] [pattern]` | Search journald with date range |
+
+**Utilities:**
+
+| Command | Description |
+|---------|-------------|
+| `health` | Quick health check all services |
+| `status [app]` | App/service status |
+| `list` | List all apps/containers |
+
+### Security
+
+The script is **read-only by design**:
+- All commands are hardcoded (no arbitrary command execution)
+- Input validation via regex for app names, containers, patterns
+- Line limits enforced (max 1000)
+- Search patterns restricted to safe characters only
+- App whitelist for known services
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DOKKU_HOST` | `dokku-scenextras.eastus.cloudapp.azure.com` | Dokku server hostname |
+| `DOKKU_USER` | `dokku` | Dokku SSH user |
+| `DOKKU_SSH_KEY` | `~/.ssh/dokku_azure` | Path to SSH key |
 
 ## Emergency Rollback
 

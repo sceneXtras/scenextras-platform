@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/MCPs" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/automations" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/eu_leapfrog_repo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/frontend_webapp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/golang_auth_gateway" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/golang_search_engine" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/golang_transcription_service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/health-monitor" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/mobile_app_sx" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/mobile_app_sx-expo-ota" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/posthog_ops" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sceneXtras" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sceneXtras-prompt-management" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/website-backoffice" vcs="Git" />
+  </component>
+</project>

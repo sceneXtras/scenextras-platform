@@ -950,3 +950,84 @@ All services require `.env` files for configuration. See `.env.example` files in
 ### Deployment
 - **Zero-Downtime Deployment:** See "Zero-Downtime Deployment (Dokku)" section in this file for required health check implementation
 - **Required Files:** `CHECKS`, `app.json` with healthchecks, Dockerfile `HEALTHCHECK`, `/healthcheck/ready` endpoint
+
+## Production Log Viewer
+
+A secure, read-only log viewer script for checking production logs from various sources.
+
+### Location
+
+```bash
+scripts/ops/logs.sh
+```
+
+### Usage
+
+```bash
+# Interactive menu (recommended for exploration)
+./scripts/ops/logs.sh
+
+# Recent/live logs
+./scripts/ops/logs.sh dokku scenextras 200          # Last 200 lines from app
+./scripts/ops/logs.sh dokku scenextras -f           # Follow logs live
+./scripts/ops/logs.sh nginx error 50                # Last 50 nginx error lines
+./scripts/ops/logs.sh search scenextras "error" 100 # Search recent logs
+
+# Historical logs (past containers, rotated files)
+./scripts/ops/logs.sh history scenextras "1 day ago"                    # App logs from journald
+./scripts/ops/logs.sh history scenextras "2024-01-15" "2024-01-16" "error"  # Date range + pattern
+./scripts/ops/logs.sh history scenextras "yesterday" "" "timeout" 500   # Yesterday's timeouts
+./scripts/ops/logs.sh history-nginx error "502" 200                     # Search rotated nginx logs
+./scripts/ops/logs.sh history-docker scenextras.web.1 "error"           # Docker log files
+./scripts/ops/logs.sh history-journal docker "1 week ago"               # Journald with date range
+
+# Utilities
+./scripts/ops/logs.sh health                        # Quick health check all services
+./scripts/ops/logs.sh list                          # List all apps/containers
+```
+
+### Available Commands
+
+**Recent/Live Logs:**
+
+| Command | Description |
+|---------|-------------|
+| `dokku <app> [lines] [-f]` | Dokku app logs (follow with -f) |
+| `nginx <access\|error> [lines] [app]` | Nginx access/error logs |
+| `docker [container] [lines] [-f]` | Docker container logs |
+| `system [service] [lines]` | System/journald logs |
+| `search <app> <pattern> [lines]` | Search in recent app logs |
+
+**Historical Logs (past containers, rotated files):**
+
+| Command | Description |
+|---------|-------------|
+| `history <app> [since] [until] [pattern] [lines]` | Search app logs via journald |
+| `history-nginx <access\|error> [pattern] [lines]` | Search rotated nginx logs |
+| `history-docker [container] [pattern] [lines]` | Search Docker log files on disk |
+| `history-journal [service] [since] [until] [pattern]` | Search journald with date range |
+
+**Utilities:**
+
+| Command | Description |
+|---------|-------------|
+| `health` | Quick health check all services |
+| `status [app]` | App/service status |
+| `list` | List all apps/containers |
+
+### Security
+
+The script is **read-only by design**:
+- All commands are hardcoded (no arbitrary command execution)
+- Input validation via regex for app names, containers, patterns
+- Line limits enforced (max 1000)
+- Search patterns restricted to safe characters only
+- App whitelist for known services
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DOKKU_HOST` | `dokku-scenextras.eastus.cloudapp.azure.com` | Dokku server hostname |
+| `DOKKU_USER` | `dokku` | Dokku SSH user |
+| `DOKKU_SSH_KEY` | `~/.ssh/dokku_azure` | Path to SSH key |
