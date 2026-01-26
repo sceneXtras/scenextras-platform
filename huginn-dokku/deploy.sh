@@ -57,6 +57,12 @@ configure_env() {
     SECRET_KEY=${HUGINN_SECRET_KEY:-$(openssl rand -hex 64)}
     INVITATION_CODE=${HUGINN_INVITATION_CODE:-$(openssl rand -hex 16)}
 
+    # Require explicit password
+    if [ -z "$HUGINN_ADMIN_PASSWORD" ]; then
+        echo -e "${RED}Error: HUGINN_ADMIN_PASSWORD env var is required.${NC}"
+        exit 1
+    fi
+
     ssh_dokku "dokku config:set --no-restart $APP_NAME \
         RAILS_ENV=production \
         DOMAIN=$DOMAIN \
@@ -66,7 +72,7 @@ configure_env() {
         SECRET_KEY_BASE=$SECRET_KEY \
         INVITATION_CODE=$INVITATION_CODE \
         SEED_USERNAME=admin \
-        SEED_PASSWORD=${HUGINN_ADMIN_PASSWORD:-changeme123} \
+        SEED_PASSWORD=$HUGINN_ADMIN_PASSWORD \
         SEED_EMAIL=${HUGINN_ADMIN_EMAIL:-admin@example.com} \
         TIMEZONE=${TIMEZONE:-America/Los_Angeles} \
         SMTP_DOMAIN=${SMTP_DOMAIN:-} \

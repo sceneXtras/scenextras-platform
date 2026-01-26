@@ -19,3 +19,18 @@
 [submodule "website-backoffice"]
 	path = website-backoffice
 	url = https://github.com/Securiteru/website-backoffice
+[submodule "bug-report"]
+	path = bug-report
+	url = https://github.com/sceneXtras/bug-report-api.git
+[submodule "eu_leapfrog_repo"]
+	path = eu_leapfrog_repo
+	url = https://github.com/sceneXtras/eu_leapfrog_repo
+[submodule "MCPs"]
+	path = MCPs
+	url = https://github.com/sceneXtras/MCPs.git
+[submodule "posthog_ops"]
+	path = posthog_ops
+	url = https://github.com/sceneXtras/sx_ops.git
+[submodule "golang_transcription_service"]
+	path = golang_transcription_service
+	url = https://github.com/sceneXtras/golang_transcriber_engine.git

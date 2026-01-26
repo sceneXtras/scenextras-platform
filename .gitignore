@@ -1,17 +1,12 @@
 # Non-submodule folders (local only)
-bug-report/
 cloudflare_ops/
 customerio_ops/
-posthog_ops/
 revenucat_ops/
+health-monitor/
 mobile_app_sx-expo-ota/
 sceneXtras-prompt-management/
-golang_transcription_service/
-health-monitor/
-MCPs/
 scripts/
 thoughts/
-eu_leapfrog_repo/
 
 .mcp.json
 .claude/
