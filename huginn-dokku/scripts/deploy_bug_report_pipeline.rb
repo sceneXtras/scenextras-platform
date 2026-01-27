@@ -11,7 +11,7 @@ require 'securerandom'
 
 # Configuration
 LINEAR_API_KEY = ENV['LINEAR_API_KEY'] || raise("LINEAR_API_KEY required")
-LINEAR_TEAM_KEY = ENV['LINEAR_TEAM_KEY'] || 'scenextras'
+LINEAR_TEAM_ID = ENV['LINEAR_TEAM_ID'] || 'ea32dd92-d7ac-40f6-bcac-eacbcd72442c'
 DISCORD_WEBHOOK_URL = ENV['DISCORD_WEBHOOK_URL'] || 'https://discord.com/api/webhooks/1456249665266909281/krMsTJ4Sgbsyz5HTb93xZfvY3QvtRZVhXBbbow_Eu3HgowBkncPNrdyEZBbWfRp-sFzN'
 ADMIN_USERNAME = ENV['HUGINN_ADMIN_USERNAME'] || 'admin'
 
@@ -41,7 +41,7 @@ LINEAR_LABEL_IDS = {
 }.freeze
 
 puts "Deploying Bug Report Pipeline..."
-puts "  Linear Team: #{LINEAR_TEAM_KEY}"
+puts "  Linear Team: #{LINEAR_TEAM_ID}"
 puts "  Discord: #{DISCORD_WEBHOOK_URL[0..50]}..."
 
 # Find user
@@ -83,6 +83,7 @@ puts "Created: #{webhook_receiver.name}"
 # =============================================================================
 formatter_code = <<~JS
   Agent.receive = function() {
+    var agent = this;
     var events = this.incomingEvents();
 
     // Label ID map from environment (populated by setup script)
@@ -219,36 +220,89 @@ formatter_code = <<~JS
       // Filter out empty label IDs
       labelIds = labelIds.filter(function(id) { return id && id.length > 0; });
 
-      this.createEvent({
-        payload: {
-          // Original data
-          report_id: report.id,
-          title: report.title || "Bug Report",
-          description_raw: report.description,
-          platform: labels.platform || (report.deviceInfo ? report.deviceInfo.platform : "Unknown"),
-          os: labels.os || "Unknown",
-          app_version: report.deviceInfo ? report.deviceInfo.appVersion : "Unknown",
-          current_route: report.currentRoute,
-          route_domain: labels.routeDomain || "unknown",
-          user_id: report.userInfo ? report.userInfo.userId : null,
-          user_email: labels.userEmail || null,
-          user_tier: labels.userTier || null,
-          screenshot_url: report.screenshotUrl,
-          trace_id: report.traceId,
-          severity: labels.severity || "medium",
+      // Build the complete GraphQL mutation with proper JSON
+      var linearTitle = "[Bug] " + (report.title || "Bug Report");
+      var linearDescription = description.join("\\n");
+      var teamId = "ea32dd92-d7ac-40f6-bcac-eacbcd72442c";
 
-          // Formatted for Linear
-          linear_title: "[Bug] " + (report.title || "Bug Report"),
-          linear_description: description.join("\\n"),
-          linear_priority: priority,
-          linear_label_ids: labelIds,
-          linear_label_names: labelNames,
+      // Build mutation - include labelIds only if we have them
+      var mutation;
+      var variables;
+      if (labelIds.length > 0) {
+        mutation = "mutation CreateIssue($title: String!, $description: String!, $teamId: String!, $labelIds: [String!]) { issueCreate(input: { title: $title, description: $description, teamId: $teamId, labelIds: $labelIds }) { success issue { id identifier url labels { nodes { id name } } } } }";
+        variables = {
+          title: linearTitle,
+          description: linearDescription,
+          teamId: teamId,
+          labelIds: labelIds
+        };
+      } else {
+        mutation = "mutation CreateIssue($title: String!, $description: String!, $teamId: String!) { issueCreate(input: { title: $title, description: $description, teamId: $teamId }) { success issue { id identifier url } } }";
+        variables = {
+          title: linearTitle,
+          description: linearDescription,
+          teamId: teamId
+        };
+      }
 
-          // For Discord
-          emoji: emoji,
-          priority_label: priority === 1 ? "Urgent" : (priority === 2 ? "High" : (priority === 4 ? "Low" : "Normal")),
-          timestamp: new Date().toISOString()
+      // Complete GraphQL body as JSON string
+      var linearGraphqlBody = JSON.stringify({
+        query: mutation,
+        variables: variables
+      });
+
+      // Base64 encode for safe shell transport
+      var linearGraphqlBodyB64 = '';
+      try {
+        // Huginn's JS engine may not have btoa, use manual base64
+        var b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+        var bytes = [];
+        for (var i = 0; i < linearGraphqlBody.length; i++) {
+          bytes.push(linearGraphqlBody.charCodeAt(i));
         }
+        for (var i = 0; i < bytes.length; i += 3) {
+          var b1 = bytes[i] || 0;
+          var b2 = bytes[i+1] || 0;
+          var b3 = bytes[i+2] || 0;
+          linearGraphqlBodyB64 += b64chars[(b1 >> 2)];
+          linearGraphqlBodyB64 += b64chars[((b1 & 3) << 4) | (b2 >> 4)];
+          linearGraphqlBodyB64 += (i+1 < bytes.length) ? b64chars[((b2 & 15) << 2) | (b3 >> 6)] : '=';
+          linearGraphqlBodyB64 += (i+2 < bytes.length) ? b64chars[b3 & 63] : '=';
+        }
+      } catch(e) {
+        linearGraphqlBodyB64 = '';
+      }
+
+      agent.createEvent({
+        // Original data
+        report_id: report.id,
+        title: report.title || "Bug Report",
+        description_raw: report.description,
+        platform: labels.platform || (report.deviceInfo ? report.deviceInfo.platform : "Unknown"),
+        os: labels.os || "Unknown",
+        app_version: report.deviceInfo ? report.deviceInfo.appVersion : "Unknown",
+        current_route: report.currentRoute,
+        route_domain: labels.routeDomain || "unknown",
+        user_id: report.userInfo ? report.userInfo.userId : null,
+        user_email: labels.userEmail || null,
+        user_tier: labels.userTier || null,
+        screenshot_url: report.screenshotUrl,
+        trace_id: report.traceId,
+        severity: labels.severity || "medium",
+
+        // Formatted for Linear - complete GraphQL body (raw and base64 encoded)
+        linear_graphql_body: linearGraphqlBody,
+        linear_graphql_body_b64: linearGraphqlBodyB64,
+        linear_title: linearTitle,
+        linear_description: linearDescription,
+        linear_priority: priority,
+        linear_label_ids: labelIds,
+        linear_label_names: labelNames,
+
+        // For Discord
+        emoji: emoji,
+        priority_label: priority === 1 ? "Urgent" : (priority === 2 ? "High" : (priority === 4 ? "Low" : "Normal")),
+        timestamp: new Date().toISOString()
       });
     });
   }
@@ -268,59 +322,23 @@ formatter = user.agents.create!(
 puts "Created: #{formatter.name}"
 
 # =============================================================================
-# 3. Linear Ticket Creator - uses Linear GraphQL API
+# 3. Linear Ticket Creator - uses ShellCommandAgent for HTTP request
 # =============================================================================
-linear_mutation = <<~GRAPHQL
-  mutation CreateIssue($title: String!, $description: String!, $teamId: String!, $priority: Int, $labelIds: [String!]) {
-    issueCreate(input: {
-      title: $title
-      description: $description
-      teamId: $teamId
-      priority: $priority
-      labelIds: $labelIds
-    }) {
-      success
-      issue {
-        id
-        identifier
-        url
-        labels {
-          nodes {
-            id
-            name
-          }
-        }
-      }
-    }
-  }
-GRAPHQL
-
+# PostAgent doesn't support raw string payloads, and JavaScript agent lacks HTTP.
+# We use ShellCommandAgent to run curl with the pre-built JSON body.
+# The formatter outputs linear_graphql_body as a complete JSON string.
 linear_creator = user.agents.create!(
   name: 'Bug Report Linear Creator',
-  type: 'Agents::PostAgent',
+  type: 'Agents::ShellCommandAgent',
   schedule: 'never',
   keep_events_for: 2592000,
   options: {
-    'post_url' => 'https://api.linear.app/graphql',
-    'expected_receive_period_in_days' => 7,
-    'content_type' => 'json',
-    'method' => 'post',
-    'payload' => {
-      'query' => linear_mutation,
-      'variables' => {
-        'title' => '{{ linear_title }}',
-        'description' => '{{ linear_description }}',
-        'teamId' => LINEAR_TEAM_KEY,
-        'priority' => '{{ linear_priority }}',
-        'labelIds' => '{{ linear_label_ids }}'
-      }
-    },
-    'headers' => {
-      'Content-Type' => 'application/json',
-      'Authorization' => LINEAR_API_KEY
-    },
-    'no_merge' => 'true',
-    'emit_events' => 'true'
+    'path' => '/usr/bin',
+    'command' => "echo '{{ linear_graphql_body_b64 }}' | base64 -d | curl -s -X POST https://api.linear.app/graphql -H 'Content-Type: application/json' -H 'Authorization: #{LINEAR_API_KEY}' -d @-",
+    'expected_update_period_in_days' => 7,
+    'unbundle' => 'false',
+    'suppress_on_failure' => 'false',
+    'suppress_on_empty_output' => 'false'
   }
 )
 puts "Created: #{linear_creator.name}"
