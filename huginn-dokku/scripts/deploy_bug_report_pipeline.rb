@@ -150,6 +150,8 @@ formatter_code = <<~JS
       }
 
       description.push("---");
+      description.push("**[View Full Report](https://bug-report.scenextras.com/inspector/" + report.id + ")**");
+      description.push("");
       description.push("*Report ID: " + report.id + "*");
       if (report.traceId) {
         description.push("*Trace ID: " + report.traceId + "*");
@@ -310,9 +312,9 @@ linear_creator = user.agents.create!(
         'description' => '{{ linear_description }}',
         'teamId' => LINEAR_TEAM_KEY,
         'priority' => '{{ linear_priority }}',
-        'labelIds' => '{{ linear_label_ids | json }}'
+        'labelIds' => '{{ linear_label_ids }}'
       }
-    }.to_json,
+    },
     'headers' => {
       'Content-Type' => 'application/json',
       'Authorization' => LINEAR_API_KEY
@@ -341,7 +343,7 @@ discord_notifier = user.agents.create!(
         {
           'title' => '{{ emoji }} Bug Report: {{ title }}',
           'description' => '{{ description_raw }}',
-          'color' => 15158332, # Red-ish
+          'color' => 15158332,
           'fields' => [
             { 'name' => 'Severity', 'value' => '{{ severity }}', 'inline' => true },
             { 'name' => 'Platform', 'value' => '{{ platform }}', 'inline' => true },
@@ -358,7 +360,7 @@ discord_notifier = user.agents.create!(
           'timestamp' => '{{ timestamp }}'
         }
       ]
-    }.to_json,
+    },
     'headers' => {
       'Content-Type' => 'application/json'
     },
