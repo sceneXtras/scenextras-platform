@@ -1,0 +1,226 @@
+# GitHub Copilot Agent Workflow
+#
+# Triggers Copilot agent execution directly from GitHub Actions.
+# Can be triggered by:
+# - workflow_dispatch (manual with prompt input)
+# - Issue labeled "@copilot"
+# - PR comment containing "@copilot"
+# - Repository dispatch (for external triggers)
+
+name: Copilot Agent
+
+on:
+  # Manual trigger with prompt input
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Task for Copilot agent"
+        required: true
+        type: string
+      model:
+        description: "AI model to use"
+        required: false
+        default: "claude-sonnet-4"
+        type: choice
+        options:
+          - claude-sonnet-4
+          - claude-opus-4
+          - gpt-4o
+          - gpt-5
+      create_pr:
+        description: "Create a PR with changes"
+        required: false
+        default: true
+        type: boolean
+
+  # Issue labeled with "@copilot"
+  issues:
+    types: [labeled]
+
+  # PR or issue comment
+  issue_comment:
+    types: [created]
+
+  # External trigger (from n8n, Huginn, etc.)
+  repository_dispatch:
+    types: [copilot-agent]
+
+# Concurrency: only one agent at a time per repo
+concurrency:
+  group: copilot-agent
+  cancel-in-progress: false
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+
+    # Only run if:
+    # - workflow_dispatch OR
+    # - Issue labeled "@copilot" OR
+    # - Comment contains "@copilot" OR
+    # - repository_dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'issues' && github.event.label.name == '@copilot') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@copilot'))
+
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+          token: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Copilot CLI
+        run: npm i -g @github/copilot
+
+      - name: Determine prompt
+        id: prompt
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "prompt=${{ github.event.inputs.prompt }}" >> $GITHUB_OUTPUT
+            echo "model=${{ github.event.inputs.model || 'claude-sonnet-4' }}" >> $GITHUB_OUTPUT
+            echo "create_pr=${{ github.event.inputs.create_pr || 'true' }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "prompt=${{ github.event.client_payload.prompt }}" >> $GITHUB_OUTPUT
+            echo "model=${{ github.event.client_payload.model || 'claude-sonnet-4' }}" >> $GITHUB_OUTPUT
+            echo "create_pr=${{ github.event.client_payload.create_pr || 'true' }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "issues" ]; then
+            # Use issue body as prompt
+            echo "prompt<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ github.event.issue.body }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "model=claude-sonnet-4" >> $GITHUB_OUTPUT
+            echo "create_pr=true" >> $GITHUB_OUTPUT
+          else
+            # Extract prompt from comment (remove @copilot mention)
+            COMMENT="${{ github.event.comment.body }}"
+            PROMPT=$(echo "$COMMENT" | sed 's/@copilot//g' | xargs)
+            echo "prompt<<EOF" >> $GITHUB_OUTPUT
+            echo "$PROMPT" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "model=claude-sonnet-4" >> $GITHUB_OUTPUT
+            echo "create_pr=${{ !github.event.issue.pull_request }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create agent branch
+        id: branch
+        run: |
+          BRANCH_NAME="copilot-agent/$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH_NAME"
+          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Configure git
+        run: |
+          git config user.email "copilot-agent@scenextras.com"
+          git config user.name "Copilot Agent"
+
+      - name: Run Copilot Agent
+        id: copilot
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set +e  # Don't exit on error
+
+          echo "Running Copilot agent with prompt:"
+          echo "${{ steps.prompt.outputs.prompt }}"
+          echo "---"
+
+          # Run Copilot CLI
+          copilot --prompt "${{ steps.prompt.outputs.prompt }}" \
+            --model "${{ steps.prompt.outputs.model }}" \
+            --allow-all-tools \
+            --allow-all-paths \
+            --no-interactive \
+            < /dev/null 2>&1 | tee copilot-output.txt
+
+          EXIT_CODE=$?
+
+          # Check for changes
+          CHANGED_FILES=$(git status --porcelain | wc -l | xargs)
+          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+          if [ "$CHANGED_FILES" -gt 0 ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "Copilot made $CHANGED_FILES file changes"
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "No changes made by Copilot"
+          fi
+
+      - name: Commit changes
+        if: steps.copilot.outputs.changed_files > 0
+        run: |
+          git add -A
+          git commit -m "[copilot-agent] ${{ steps.prompt.outputs.prompt }}" \
+            -m "" \
+            -m "Triggered by: ${{ github.event_name }}" \
+            -m "Model: ${{ steps.prompt.outputs.model }}" \
+            -m "Actor: ${{ github.actor }}"
+
+      - name: Push and create PR
+        if: steps.copilot.outputs.changed_files > 0 && steps.prompt.outputs.create_pr == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          git push origin ${{ steps.branch.outputs.branch }}
+
+          # Create PR
+          gh pr create \
+            --title "[Copilot Agent] ${{ steps.prompt.outputs.prompt }}" \
+            --body "## Summary
+
+          This PR was automatically generated by a Copilot agent.
+
+          ### Task
+          ${{ steps.prompt.outputs.prompt }}
+
+          ### Trigger
+          - Event: \`${{ github.event_name }}\`
+          - Actor: @${{ github.actor }}
+          - Model: \`${{ steps.prompt.outputs.model }}\`
+
+          ### Copilot Output
+          \`\`\`
+          $(cat copilot-output.txt | tail -100)
+          \`\`\`
+
+          ---
+          Generated with [Copilot Agent Trigger](https://github.com/scenextras/copilot-agent-trigger)" \
+            --base ${{ github.event.repository.default_branch }}
+
+      - name: Comment on issue (if triggered by issue)
+        if: github.event_name == 'issues' || github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUMBER=${{ github.event.issue.number }}
+
+          if [ "${{ steps.copilot.outputs.success }}" = "true" ]; then
+            gh issue comment $ISSUE_NUMBER \
+              --body "Copilot agent completed. Made ${{ steps.copilot.outputs.changed_files }} file changes. PR created."
+          else
+            gh issue comment $ISSUE_NUMBER \
+              --body "Copilot agent ran but made no changes. Exit code: ${{ steps.copilot.outputs.exit_code }}"
+          fi
+
+      - name: Upload Copilot output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: copilot-output
+          path: copilot-output.txt
+          retention-days: 7
