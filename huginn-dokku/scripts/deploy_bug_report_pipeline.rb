@@ -688,11 +688,11 @@ if COPILOT_ENABLED
         # Decode base64 body to preserve newlines
         ISSUE_BODY=$(echo "{{ github_issue_body_b64 }}" | base64 -d)
 
-        # Build labels array - add "test" label for test reports
+        # Build labels array - add "test" label for test reports, "@copilot" to trigger workflow
         if [ "$IS_TEST" = "true" ]; then
-          LABELS='["bug", "test"]'
+          LABELS='["bug", "test", "@copilot"]'
         else
-          LABELS='["bug"]'
+          LABELS='["bug", "@copilot"]'
         fi
 
         PAYLOAD=$(jq -n \\

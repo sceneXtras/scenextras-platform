@@ -20,9 +20,10 @@ on:
       model:
         description: "AI model to use"
         required: false
-        default: "claude-sonnet-4"
+        default: "claude-opus-4.5"
         type: choice
         options:
+          - claude-opus-4.5
           - claude-sonnet-4
           - claude-opus-4
           - gpt-4o
@@ -90,18 +91,18 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "prompt=${{ github.event.inputs.prompt }}" >> $GITHUB_OUTPUT
-            echo "model=${{ github.event.inputs.model || 'claude-sonnet-4' }}" >> $GITHUB_OUTPUT
+            echo "model=${{ github.event.inputs.model || 'claude-opus-4.5' }}" >> $GITHUB_OUTPUT
             echo "create_pr=${{ github.event.inputs.create_pr || 'true' }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             echo "prompt=${{ github.event.client_payload.prompt }}" >> $GITHUB_OUTPUT
-            echo "model=${{ github.event.client_payload.model || 'claude-sonnet-4' }}" >> $GITHUB_OUTPUT
+            echo "model=${{ github.event.client_payload.model || 'claude-opus-4.5' }}" >> $GITHUB_OUTPUT
             echo "create_pr=${{ github.event.client_payload.create_pr || 'true' }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "issues" ]; then
             # Use issue body as prompt
             echo "prompt<<EOF" >> $GITHUB_OUTPUT
             echo "${{ github.event.issue.body }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
-            echo "model=claude-sonnet-4" >> $GITHUB_OUTPUT
+            echo "model=claude-opus-4.5" >> $GITHUB_OUTPUT
             echo "create_pr=true" >> $GITHUB_OUTPUT
           else
             # Extract prompt from comment (remove @copilot mention)
@@ -110,9 +111,78 @@ jobs:
             echo "prompt<<EOF" >> $GITHUB_OUTPUT
             echo "$PROMPT" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
-            echo "model=claude-sonnet-4" >> $GITHUB_OUTPUT
+            echo "model=claude-opus-4.5" >> $GITHUB_OUTPUT
             echo "create_pr=${{ !github.event.issue.pull_request }}" >> $GITHUB_OUTPUT
           fi
+
+      - name: Build Copilot prompt
+        id: build_prompt
+        run: |
+          RAW_PROMPT='${{ steps.prompt.outputs.prompt }}'
+
+          # Detect bug report: check for YAML frontmatter with report_id or [Bug] in title
+          IS_BUG_REPORT=false
+          if echo "$RAW_PROMPT" | grep -q 'report_id:'; then
+            IS_BUG_REPORT=true
+          fi
+          if echo "$RAW_PROMPT" | grep -q '\[Bug\]'; then
+            IS_BUG_REPORT=true
+          fi
+
+          if [ "$IS_BUG_REPORT" = "true" ]; then
+            echo "Detected bug report - wrapping in investigation prompt"
+
+            cat > /tmp/copilot-prompt.txt << 'PROMPT_EOF'
+          You are a senior software engineer investigating and fixing a bug in the SceneXtras platform.
+
+          ## Your Task
+          1. ANALYZE the bug report below - understand the user's issue, platform, route, and logs
+          2. INVESTIGATE the codebase - find the relevant files using the route and code hints
+          3. IDENTIFY the root cause by tracing the error through logs and code
+          4. IMPLEMENT a fix - make minimal, targeted changes
+          5. VERIFY your fix addresses the issue described
+
+          ## Codebase Context
+          - Python API Backend: `sceneXtras/api/` (FastAPI)
+          - React Web Frontend: `frontend_webapp/` (React 18 + TypeScript)
+          - Go Search Engine: `golang_search_engine/`
+          - React Native Mobile App: `mobile_app_sx/` (Expo)
+          - See CLAUDE.md for full architecture details
+
+          ## Investigation Protocol
+          1. Read the bug report metadata (platform, route, severity)
+          2. Check the investigation hints for relevant file paths
+          3. Read the application logs for error patterns
+          4. Open and read the relevant source files
+          5. Trace the bug from the user action → code path → failure point
+          6. Write the fix with proper error handling
+          7. Do NOT add features or refactor - only fix the reported issue
+
+          ## Rules
+          - Make MINIMAL changes - fix the bug, nothing else
+          - Follow existing code patterns in each service
+          - Add error handling only where the bug occurs
+          - Do NOT modify test files unless the fix requires it
+          - Wrap significant changes behind a feature flag if appropriate
+
+          ## Bug Report
+          ---
+          PROMPT_EOF
+
+            # Append the raw issue body
+            echo "$RAW_PROMPT" >> /tmp/copilot-prompt.txt
+            echo '---' >> /tmp/copilot-prompt.txt
+
+            echo "final_prompt_file=/tmp/copilot-prompt.txt" >> $GITHUB_OUTPUT
+            echo "is_bug_report=true" >> $GITHUB_OUTPUT
+          else
+            echo "Not a bug report - passing prompt through unchanged"
+            echo "$RAW_PROMPT" > /tmp/copilot-prompt.txt
+            echo "final_prompt_file=/tmp/copilot-prompt.txt" >> $GITHUB_OUTPUT
+            echo "is_bug_report=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Prompt size: $(wc -c < /tmp/copilot-prompt.txt) bytes"
 
       - name: Create agent branch
         id: branch
@@ -155,12 +225,13 @@ jobs:
         run: |
           set +e  # Don't exit on error
 
-          echo "Running Copilot agent with prompt:"
-          echo "${{ steps.prompt.outputs.prompt }}"
+          echo "Running Copilot agent with model: ${{ steps.prompt.outputs.model }}"
+          echo "Bug report mode: ${{ steps.build_prompt.outputs.is_bug_report }}"
+          echo "Prompt file size: $(wc -c < ${{ steps.build_prompt.outputs.final_prompt_file }}) bytes"
           echo "---"
 
           # Run Copilot CLI (-p for non-interactive prompt)
-          copilot -p "${{ steps.prompt.outputs.prompt }}" \
+          copilot -p "$(cat ${{ steps.build_prompt.outputs.final_prompt_file }})" \
             --model "${{ steps.prompt.outputs.model }}" \
             --allow-all-tools \
             --allow-all-paths \
@@ -185,6 +256,8 @@ jobs:
         if: steps.copilot.outputs.changed_files > 0
         run: |
           git add -A
+          git reset HEAD copilot-output.txt .github/copilot-mcp.json 2>/dev/null || true
+          git reset HEAD ~/.copilot/ /tmp/copilot-prompt.txt 2>/dev/null || true
           git commit -m "[copilot-agent] ${{ steps.prompt.outputs.prompt }}" \
             -m "" \
             -m "Triggered by: ${{ github.event_name }}" \
