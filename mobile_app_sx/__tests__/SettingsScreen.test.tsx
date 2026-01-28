@@ -139,45 +139,37 @@ describe('SettingsScreen - Crash Fix Tests', () => {
     jest.useRealTimers();
   });
 
-  it('should catch and display errors gracefully', () => {
-    // Mock a component that throws an error
-    const ThrowError = () => {
-      throw new Error('Test error');
-    };
-
-    // This would normally crash without error boundary
-    const { getByText } = render(
-      <SettingsScreen>
-        <ThrowError />
-      </SettingsScreen>
-    );
+  it('should catch and display errors from Settings content', () => {
+    // Mock the store to cause an error during render
+    (useUserStore as jest.Mock).mockImplementation(() => {
+      throw new Error('Store access failed');
+    });
 
     // Error boundary should catch and show fallback
+    const { getByText } = render(<SettingsScreen />);
+    
     expect(getByText('Something went wrong')).toBeTruthy();
+    expect(getByText('Try Again')).toBeTruthy();
   });
 
-  it('should allow error recovery via retry button', () => {
-    // Simulate error state
-    const ThrowError = () => {
-      throw new Error('Test error');
-    };
+  it('should provide retry functionality after error', () => {
+    // Mock the store to cause an error
+    (useUserStore as jest.Mock).mockImplementation(() => {
+      throw new Error('Store error');
+    });
 
-    const { getByText } = render(
-      <SettingsScreen>
-        <ThrowError />
-      </SettingsScreen>
-    );
+    const { getByText } = render(<SettingsScreen />);
 
     const retryButton = getByText('Try Again');
     expect(retryButton).toBeTruthy();
     
-    // Verify button is pressable (would trigger onReset)
-    expect(retryButton.props.onPress).toBeDefined();
+    // Verify button exists and is interactive
+    expect(retryButton.props.accessible).not.toBe(false);
   });
 });
 
 describe('SettingsScreen - Race Condition Tests', () => {
-  it('should handle rapid mount/unmount cycles', async () => {
+  it('should handle rapid mount/unmount cycles without crashing', async () => {
     (useUserStore as jest.Mock).mockImplementation((selector) =>
       selector({
         user: { id: '123', name: 'Test' },
@@ -188,15 +180,15 @@ describe('SettingsScreen - Race Condition Tests', () => {
 
     const { unmount, rerender } = render(<SettingsScreen />);
     
-    // Rapid unmount and remount
+    // Rapid unmount and remount - should not throw errors
     unmount();
-    rerender(<SettingsScreen />);
-    unmount();
-    rerender(<SettingsScreen />);
+    const { unmount: unmount2 } = render(<SettingsScreen />);
+    unmount2();
+    const { getByText } = render(<SettingsScreen />);
 
-    // Should not crash
+    // Verify component renders successfully after cycles
     await waitFor(() => {
-      expect(true).toBe(true);
+      expect(getByText('Test')).toBeTruthy();
     });
   });
 

@@ -64,11 +64,11 @@ export class SettingsErrorBoundary extends React.Component<Props, State> {
   };
 
   render() {
-    if (this.state.hasError) {
+    if (this.state.hasError && this.state.error) {
       const FallbackComponent = this.props.fallback || DefaultFallback;
       return (
         <FallbackComponent
-          error={this.state.error!}
+          error={this.state.error}
           resetError={this.resetError}
         />
       );
@@ -82,6 +82,8 @@ export class SettingsErrorBoundary extends React.Component<Props, State> {
  * Default fallback UI when error occurs
  */
 function DefaultFallback({ error, resetError }: FallbackProps) {
+  const errorMessage = error?.message || 'An unknown error occurred';
+  
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -91,7 +93,7 @@ function DefaultFallback({ error, resetError }: FallbackProps) {
         </Text>
         {__DEV__ && (
           <Text style={styles.errorDetails}>
-            {error.message}
+            {errorMessage}
           </Text>
         )}
         <TouchableOpacity

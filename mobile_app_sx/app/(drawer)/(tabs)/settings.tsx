@@ -15,27 +15,31 @@ import { useUserStore } from '../../../store/userStore';
  * Protected against crashes with defensive checks
  */
 function SettingsContent() {
-  const user = useUserStore((state) => state?.user);
-  const isLoading = useUserStore((state) => state?.isLoading ?? false);
-  const isInitialized = useUserStore((state) => state?.isInitialized ?? false);
+  const user = useUserStore((state) => state.user);
+  const isLoading = useUserStore((state) => state.isLoading);
+  const isInitialized = useUserStore((state) => state.isInitialized);
   const [isReady, setIsReady] = useState(false);
 
   // Ensure store is initialized before rendering
   useEffect(() => {
     let isMounted = true;
 
-    // Small delay to ensure store hydration is complete
-    const timer = setTimeout(() => {
-      if (isMounted) {
+    // Ensure the component waits for initial store hydration
+    const checkReady = () => {
+      if (isMounted && isInitialized) {
         setIsReady(true);
       }
-    }, 100);
+    };
+
+    // Check immediately and set up a brief timeout as fallback
+    checkReady();
+    const timer = setTimeout(checkReady, 50);
 
     return () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, []);
+  }, [isInitialized]);
 
   // Show loading state while initializing
   if (isLoading || !isReady || !isInitialized) {
@@ -53,7 +57,7 @@ function SettingsContent() {
       <View style={styles.errorContainer}>
         <Text style={styles.errorTitle}>Unable to Load Settings</Text>
         <Text style={styles.errorMessage}>
-          Please check your internet connection and try again.
+          Please sign in to view your settings.
         </Text>
       </View>
     );
@@ -69,12 +73,12 @@ function SettingsContent() {
         
         <View style={styles.settingRow}>
           <Text style={styles.label}>Name</Text>
-          <Text style={styles.value}>{user?.name ?? 'Not set'}</Text>
+          <Text style={styles.value}>{user.name ?? 'Not set'}</Text>
         </View>
 
         <View style={styles.settingRow}>
           <Text style={styles.label}>Email</Text>
-          <Text style={styles.value}>{user?.email ?? 'Not set'}</Text>
+          <Text style={styles.value}>{user.email ?? 'Not set'}</Text>
         </View>
       </View>
 

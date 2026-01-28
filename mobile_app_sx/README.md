@@ -82,13 +82,31 @@ function SettingsScreen() {
 }
 
 function SettingsContent() {
-  const user = useUserStore(state => state?.user);
-  const isLoading = useUserStore(state => state?.isLoading ?? false);
+  const user = useUserStore(state => state.user);
+  const isLoading = useUserStore(state => state.isLoading);
+  const isInitialized = useUserStore(state => state.isInitialized);
   
-  if (isLoading) return <LoadingIndicator />; // ✅ Loading state
+  if (isLoading || !isInitialized) return <LoadingIndicator />; // ✅ Wait for init
   if (!user) return <ErrorMessage />;         // ✅ Handle missing data
   
-  return <Text>{user?.name ?? 'Unknown'}</Text>; // ✅ Safe access
+  return <Text>{user.name ?? 'Unknown'}</Text>; // ✅ Safe access
+}
+```
+
+## Store Initialization
+
+**Important:** The store must be initialized from the app entry point:
+
+```typescript
+// In app/_layout.tsx or App.tsx
+import { useUserStore } from './store/userStore';
+
+export default function RootLayout() {
+  useEffect(() => {
+    useUserStore.getState().initialize();
+  }, []);
+  
+  return <YourAppContent />;
 }
 ```
 

@@ -41,15 +41,14 @@ const initialState: UserStoreState = {
  */
 const createSafeStorage = () => {
   // Import MMKV only on React Native
-  let storage: any;
+  let storage: { getString: (key: string) => string | undefined; set: (key: string, value: string) => void; delete: (key: string) => void } | undefined;
   
   try {
-    if (typeof window !== 'undefined' && (window as any).MMKV) {
-      const { MMKV } = require('react-native-mmkv');
-      storage = new MMKV();
-    }
+    // Check if we're in React Native environment
+    const { MMKV } = require('react-native-mmkv');
+    storage = new MMKV();
   } catch (error) {
-    console.error('Failed to initialize MMKV storage:', error);
+    console.error('Failed to initialize MMKV storage (not in RN environment):', error);
   }
 
   return createJSONStorage(() => ({
@@ -96,20 +95,17 @@ export const useUserStore = create<UserStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          // Add a small delay to prevent race conditions
-          await new Promise((resolve) => setTimeout(resolve, 50));
-
           // TODO: Fetch user data from API if needed
           // const userData = await fetchUserData();
           // set({ user: userData, isLoading: false, isInitialized: true });
 
-          // For now, just mark as initialized
+          // Mark as initialized after store hydration completes
           set({ isLoading: false, isInitialized: true });
         } catch (error) {
           console.error('Failed to initialize user store:', error);
           set({
             isLoading: false,
-            isInitialized: true,
+            isInitialized: false, // Keep as false on error
             error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
@@ -126,21 +122,19 @@ export const useUserStore = create<UserStore>()(
       partialize: (state) => ({
         user: state.user,
       }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
         // Mark as initialized after rehydration
-        if (state) {
-          state.isInitialized = true;
+        if (state && !error) {
+          // Use proper state update instead of mutation
+          useUserStore.setState({ isInitialized: true });
         }
       },
     }
   )
 );
 
-// Auto-initialize on store creation
-// This runs once when the module is imported
-if (typeof window !== 'undefined') {
-  // Small delay to ensure the app is ready
-  setTimeout(() => {
-    useUserStore.getState().initialize();
-  }, 100);
-}
+// Note: Initialization should be triggered from the app entry point
+// Example: In App.tsx or _layout.tsx:
+// useEffect(() => {
+//   useUserStore.getState().initialize();
+// }, []);
