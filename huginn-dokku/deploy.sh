@@ -150,9 +150,14 @@ run_script() {
         exit 1
     fi
 
-    # Copy script to server and run it
-    SCRIPT_CONTENT=$(cat "$1")
-    ssh_dokku "dokku run $APP_NAME bundle exec rails runner '$SCRIPT_CONTENT'"
+    echo -e "${GREEN}Running script: $1${NC}"
+
+    # Base64 encode the script to safely transfer through SSH
+    SCRIPT_B64=$(cat "$1" | base64 | tr -d '\n')
+
+    # Use dokku enter to run in the actual container with environment variables
+    # Write script to temp file, run it, then clean up
+    ssh -i $SSH_KEY dokku@$DOKKU_HOST "dokku enter $APP_NAME web bash -c 'echo $SCRIPT_B64 | base64 -d > /tmp/script.rb && bundle exec rails runner /tmp/script.rb && rm /tmp/script.rb'"
 }
 
 case "${1:-help}" in

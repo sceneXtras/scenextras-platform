@@ -41,7 +41,47 @@ DISCORD_WEBHOOK_URL=https://... ./deploy.sh run-script scripts/deploy_discord_mo
 
 # Service health monitoring
 DISCORD_WEBHOOK_URL=https://... ./deploy.sh run-script scripts/deploy_health_monitor.rb
+
+# Bug report pipeline (Bug Report Service -> Linear + Discord)
+LINEAR_API_KEY=xxx ./deploy.sh run-script scripts/deploy_bug_report_pipeline.rb
+
+# Linear -> Customer.io support status pipeline
+CUSTOMERIO_SITE_ID=xxx CUSTOMERIO_API_KEY=xxx ./deploy.sh run-script scripts/deploy_linear_customerio_pipeline.rb
 ```
+
+### Linear -> Customer.io Support Status Pipeline
+
+This pipeline monitors Linear issue status changes and updates Customer.io user profiles for support notifications.
+
+**Workflow:**
+1. User submits bug report → Bug Report Pipeline creates Linear issue with user email in description
+2. Support team moves issue to "In Progress" → User marked `SUPPORT_REQUIRED` in Customer.io
+3. Support team moves issue to "Done" → User marked `SUPPORT_FINISHED` in Customer.io
+4. Customer.io campaigns can trigger notifications based on these attributes
+
+**Setup:**
+
+1. Deploy the pipeline:
+   ```bash
+   CUSTOMERIO_SITE_ID=xxx CUSTOMERIO_API_KEY=xxx ./deploy.sh run-script scripts/deploy_linear_customerio_pipeline.rb
+   ```
+
+2. Configure Linear webhook:
+   - Go to Linear → Settings → Team Settings → Webhooks
+   - Add the webhook URL from deployment output
+   - Select "Issues" as resource type
+   - Enable "Updated" events
+
+**Customer.io Attributes Set:**
+- `support_status`: `SUPPORT_REQUIRED` or `SUPPORT_FINISHED`
+- `support_status_label`: Human-readable label
+- `support_issue_id`: Linear issue ID (e.g., SX-123)
+- `support_issue_url`: Link to the Linear issue
+- `support_status_updated_at`: ISO timestamp
+
+**Customer.io Segments:** Create segments like:
+- "Users Awaiting Support": `support_status = SUPPORT_REQUIRED`
+- "Users with Resolved Issues": `support_status = SUPPORT_FINISHED`
 
 ## Architecture
 

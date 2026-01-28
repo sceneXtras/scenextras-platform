@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "scenextras-debug": {
+      "type": "http",
+      "url": "https://mcp.scenextras.com/mcp",
+      "headers": {
+        "X-API-Key": "mcp_915c5c54e86181b280153c9d4042c8c29075f07e02c8a22a36a9630794e91946"
+      }
+    }
+  }
+}
