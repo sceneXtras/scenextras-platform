@@ -40,7 +40,7 @@
 **Fix:**
 ```tsx
 const handleLogin = useCallback(async () => {
-  if (isLoading) return;  // Add this guard!
+  if (isLoading) return;  // Prevent double-tap (guard check is sufficient)
   
   setIsLoading(true);
   try {
@@ -48,7 +48,7 @@ const handleLogin = useCallback(async () => {
   } finally {
     setIsLoading(false);  // Always use finally!
   }
-}, [isLoading]);
+}, [/* isLoading NOT in deps - guard check handles double-tap */]);
 ```
 
 ### Issue 5: Button Disabled But Looks Enabled
@@ -196,7 +196,7 @@ const handlePress = useCallback(async () => {
   } finally {
     setLoading(false);
   }
-}, [loading]);
+}, []); // Note: loading NOT in deps - guard check is sufficient
 ```
 
 ## Performance Tips

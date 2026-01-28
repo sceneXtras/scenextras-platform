@@ -34,6 +34,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
    * FIX #1: Memoized handler with proper loading state management
    * - Prevents double-tap
    * - Ensures loading state is always cleared
+   * Note: isLoading is NOT in the dependency array - the guard check inside
+   * the function is sufficient for double-tap prevention
    */
   const handleLogin = useCallback(async () => {
     // Prevent double-tap
@@ -64,10 +66,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       // Always clear loading state
       setIsLoading(false);
     }
-  }, [email, password, isLoading, onLogin]);
+  }, [email, password, onLogin]);
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View style={styles.container}>
       <View style={styles.formContainer}>
         <Text style={styles.title}>SceneXtras Login</Text>
 

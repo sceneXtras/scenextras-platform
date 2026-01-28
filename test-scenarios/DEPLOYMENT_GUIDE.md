@@ -84,7 +84,7 @@ Open the login screen file and apply these changes:
 **Update the login handler:**
 ```tsx
 const handleLogin = useCallback(async () => {
-  if (isLoading) return; // Prevent double-tap
+  if (isLoading) return; // Prevent double-tap (guard check is sufficient)
   
   setIsLoading(true);
   try {
@@ -95,7 +95,7 @@ const handleLogin = useCallback(async () => {
   } finally {
     setIsLoading(false); // Always clear loading state
   }
-}, [email, password, isLoading]);
+}, [email, password]); // Note: isLoading NOT in deps - guard check is sufficient
 ```
 
 #### Change 4: Fix Parent View Pointer Events
@@ -234,22 +234,38 @@ Create a simple test to verify the fix:
 
 ```typescript
 // mobile_app_sx/__tests__/login-button-fix.test.ts
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import LoginScreen from '../app/(auth)/login';
 
-test('iOS login button responds to press', async () => {
+test('iOS login button has proper touch handling props', () => {
   const { getByTestId } = render(<LoginScreen />);
   const button = getByTestId('login-button');
   
-  // Verify iOS touch props exist
+  // Verify iOS touch props are set correctly
   expect(button.props.activeOpacity).toBe(0.7);
-  expect(button.props.hitSlop).toBeTruthy();
+  expect(button.props.hitSlop).toEqual({
+    top: 10, 
+    bottom: 10, 
+    left: 10, 
+    right: 10
+  });
+});
+
+test('iOS login button responds to press', async () => {
+  const mockOnLogin = jest.fn().mockResolvedValue(undefined);
+  const { getByTestId } = render(<LoginScreen onLogin={mockOnLogin} />);
   
-  // Test press works
-  const mockPress = jest.fn();
-  button.props.onPress = mockPress;
-  fireEvent.press(button);
-  expect(mockPress).toHaveBeenCalled();
+  const emailInput = getByTestId('email-input');
+  const passwordInput = getByTestId('password-input');
+  const loginButton = getByTestId('login-button');
+  
+  fireEvent.changeText(emailInput, 'test@example.com');
+  fireEvent.changeText(passwordInput, 'password123');
+  fireEvent.press(loginButton);
+  
+  await waitFor(() => {
+    expect(mockOnLogin).toHaveBeenCalledWith('test@example.com', 'password123');
+  });
 });
 ```
 

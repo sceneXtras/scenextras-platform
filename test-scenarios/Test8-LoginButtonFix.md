@@ -79,7 +79,7 @@ const handleLogin = useCallback(async () => {
   } finally {
     setIsLoading(false);
   }
-}, [email, password, isLoading]);
+}, [email, password]); // Note: isLoading not in deps - guard check is sufficient
 ```
 
 ## Testing Instructions

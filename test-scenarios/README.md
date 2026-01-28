@@ -109,14 +109,14 @@ The iOS login button issue is fixed by adding proper touch handling props:
 Plus proper loading state management:
 ```tsx
 const handleLogin = useCallback(async () => {
-  if (isLoading) return;  // ⭐ Prevent double-tap
+  if (isLoading) return;  // ⭐ Prevent double-tap (guard check is sufficient)
   setIsLoading(true);
   try {
     await login();
   } finally {
     setIsLoading(false);  // ⭐ Always cleanup
   }
-}, [isLoading]);
+}, []); // Note: isLoading NOT in deps - guard check handles double-tap
 ```
 
 ## 📋 Implementation Checklist

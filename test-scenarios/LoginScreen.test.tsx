@@ -237,11 +237,17 @@ describe('LoginScreen - iOS Touch Responsiveness', () => {
 /**
  * Integration Tests
  * 
- * These tests should be run on actual iOS devices or simulators
- * to verify real touch behavior
+ * These tests should be run manually on actual iOS devices or simulators
+ * to verify real touch behavior. To run these tests:
+ * 1. Remove the .skip from the test name
+ * 2. Run on actual iOS device/simulator
+ * 3. Manually verify the described behavior
+ * 4. Re-add .skip after verification
+ * 
+ * Alternatively, these scenarios can be tracked in a separate manual QA checklist.
  */
-describe('LoginScreen - iOS Integration Tests', () => {
-  test.skip('MANUAL TEST: Button should respond within 100ms on iOS', () => {
+describe('LoginScreen - iOS Manual Integration Tests', () => {
+  test.skip('MANUAL: Button should respond within 100ms on iOS', () => {
     // This test requires manual verification on iOS device
     // Steps:
     // 1. Run app on iOS simulator/device
@@ -251,7 +257,7 @@ describe('LoginScreen - iOS Integration Tests', () => {
     // 5. Verify button press is registered
   });
 
-  test.skip('MANUAL TEST: Button should work with VoiceOver enabled', () => {
+  test.skip('MANUAL: Button should work with VoiceOver enabled', () => {
     // This test requires manual verification with accessibility features
     // Steps:
     // 1. Enable VoiceOver on iOS device
@@ -260,7 +266,7 @@ describe('LoginScreen - iOS Integration Tests', () => {
     // 4. Verify button press is registered
   });
 
-  test.skip('MANUAL TEST: Button should work during keyboard dismissal', () => {
+  test.skip('MANUAL: Button should work during keyboard dismissal', () => {
     // This test requires manual verification
     // Steps:
     // 1. Focus on password input (keyboard shown)
