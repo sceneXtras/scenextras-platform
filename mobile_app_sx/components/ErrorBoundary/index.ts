@@ -1,0 +1,1 @@
+export { SettingsErrorBoundary } from './SettingsErrorBoundary';
