@@ -76,8 +76,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 100
-          submodules: recursive
           token: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Init submodules (best-effort)
+        run: |
+          # Init submodules individually so one failure doesn't block all
+          git submodule init
+          git submodule foreach --quiet 'echo $sm_path' | while read sm; do
+            echo "Updating submodule: $sm"
+            git submodule update --depth 50 "$sm" 2>&1 || echo "WARN: Failed to update $sm (skipping)"
+          done
+          echo "Submodule status:"
+          git submodule status
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
