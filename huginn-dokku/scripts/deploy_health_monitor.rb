@@ -12,7 +12,8 @@ ADMIN_USERNAME = ENV['HUGINN_ADMIN_USERNAME'] || 'admin'
 SERVICES = [
   { name: 'API', url: 'https://api.scenextras.com/healthcheck/ready', expected: 'ready' },
   { name: 'Search', url: 'https://api.scenextras.com/search/health', expected: 'ok' },
-  { name: 'Gateway', url: 'https://api.scenextras.com/gateway/health', expected: 'ok' }
+  { name: 'Gateway', url: 'https://api.scenextras.com/gateway/health', expected: 'ok' },
+  { name: 'LogWard', url: 'https://logging.scenextras.com/health', expected: 'ok' }
 ]
 
 puts "Deploying Health Monitor..."
