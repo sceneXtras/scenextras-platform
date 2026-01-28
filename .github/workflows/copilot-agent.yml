@@ -126,11 +126,20 @@ jobs:
           git config user.email "copilot-agent@scenextras.com"
           git config user.name "Copilot Agent"
 
+      - name: Setup MCP config
+        env:
+          MCP_SCENEXTRAS_API_KEY: ${{ secrets.MCP_SCENEXTRAS_API_KEY }}
+        run: |
+          # Substitute env var into copilot-mcp.json
+          sed -i "s|\${MCP_SCENEXTRAS_API_KEY}|${MCP_SCENEXTRAS_API_KEY}|g" .github/copilot-mcp.json
+          echo "MCP config prepared for Copilot agent"
+
       - name: Run Copilot Agent
         id: copilot
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          MCP_SCENEXTRAS_API_KEY: ${{ secrets.MCP_SCENEXTRAS_API_KEY }}
         run: |
           set +e  # Don't exit on error
 
